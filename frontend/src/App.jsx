@@ -1,270 +1,299 @@
-import { useState, useEffect } from "react";
-import "./App.css";
+import React, { useState, useEffect } from "react";
+import Navbar from "./components/Navbar";
+import LandingPage from "./components/LandingPage";
+import DashboardView from "./components/DashboardView";
+import DocumentsView from "./components/DocumentsView";
+import ProfileView from "./components/ProfileView";
+import AuthModal from "./components/AuthModal";
+import DocumentModal from "./components/DocumentModal";
+import DocumentDetailModal from "./components/DocumentDetailModal";
+import PublicIdentityModal from "./components/PublicIdentityModal";
+import ConfirmModal from "./components/ConfirmModal";
+import Toast from "./components/Toast";
+import { initialUserProfile, initialDocuments } from "./data/initialData";
 
 function App() {
+  // Persistence state
   const [documents, setDocuments] = useState(() => {
-    const saved = localStorage.getItem("documents");
-    return saved ? JSON.parse(saved) : [];
+    const saved = localStorage.getItem("memoryverse_documents");
+    return saved ? JSON.parse(saved) : initialDocuments;
   });
 
-  const [category, setCategory] = useState("Resume");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterCategory, setFilterCategory] = useState("All");
-  const [showLogin, setShowLogin] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem("memoryverse_user");
+    return saved ? JSON.parse(saved) : initialUserProfile;
+  });
 
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const saved = localStorage.getItem("memoryverse_isLoggedIn");
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  // Navigation state
+  const [activeTab, setActiveTab] = useState(() => (isLoggedIn ? "dashboard" : "landing"));
+
+  // Modals state
+  const [authModal, setAuthModal] = useState({ isOpen: false, mode: "login" });
+  const [documentModal, setDocumentModal] = useState({ isOpen: false, docToEdit: null });
+  const [detailModal, setDetailModal] = useState({ isOpen: false, doc: null });
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, docId: null });
+  const [publicProfileModal, setPublicProfileModal] = useState(false);
+
+  // Toast feedback state
+  const [toast, setToast] = useState(null);
+
+  // LocalStorage Synchronization
   useEffect(() => {
-    localStorage.setItem("documents", JSON.stringify(documents));
+    localStorage.setItem("memoryverse_documents", JSON.stringify(documents));
   }, [documents]);
 
-  const handleUpload = (e) => {
-    const files = Array.from(e.target.files);
+  useEffect(() => {
+    localStorage.setItem("memoryverse_user", JSON.stringify(user));
+  }, [user]);
 
-    const newDocs = files.map((file) => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      category,
-      size: (file.size / 1024).toFixed(2) + " KB",
-      uploadedAt: new Date().toLocaleDateString(),
-      url: URL.createObjectURL(file),
-    }));
+  useEffect(() => {
+    localStorage.setItem("memoryverse_isLoggedIn", JSON.stringify(isLoggedIn));
+  }, [isLoggedIn]);
 
-    setDocuments([...documents, ...newDocs]);
-    e.target.value = "";
+  // Toast trigger helper
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
   };
 
-  const deleteDocument = (id) => {
-    setDocuments(documents.filter((doc) => doc.id !== id));
+  // Auth operations
+  const handleAuthSuccess = (userData, message) => {
+    setUser((prev) => ({ ...prev, ...userData }));
+    setIsLoggedIn(true);
+    setActiveTab("dashboard");
+    showToast(message || "Successfully authenticated!", "success");
   };
 
-  const filteredDocuments = documents.filter((doc) => {
-    const search =
-      doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.category.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setActiveTab("landing");
+    showToast("Logged out of MemoryVerse-AI vault", "info");
+  };
 
-    const categoryMatch =
-      filterCategory === "All" || doc.category === filterCategory;
+  // Document Operations
+  const handleSaveDocument = (docObj, message) => {
+    setDocuments((prevDocs) => {
+      const exists = prevDocs.some((d) => d.id === docObj.id);
+      if (exists) {
+        return prevDocs.map((d) => (d.id === docObj.id ? docObj : d));
+      } else {
+        return [docObj, ...prevDocs];
+      }
+    });
+    showToast(message || "Document saved to vault!", "success");
+  };
 
-    return search && categoryMatch;
-  });
-    return (
-    <>
-      {/* Login Popup */}
-      {showLogin && (
-        <div className="login-overlay">
-          <div className="login-box">
-            <button
-              className="close-btn"
-              onClick={() => setShowLogin(false)}
-            >
-              ✕
-            </button>
+  const handleDeleteDocument = (docId) => {
+    setDocuments((prevDocs) => prevDocs.filter((d) => d.id !== docId));
+    showToast("Document removed from vault", "info");
+  };
 
-            <h2>Welcome Back 👋</h2>
+  const handleUpdateProfile = (updatedProfile) => {
+    setUser((prev) => ({ ...prev, ...updatedProfile }));
+    showToast("Profile settings updated", "success");
+  };
 
-            <input
-              type="email"
-              placeholder="Enter your Email"
-              className="login-input"
-            />
-
-            <input
-              type="password"
-              placeholder="Enter your Password"
-              className="login-input"
-            />
-
-            <button
-              className="login-submit"
-              onClick={() => {
-                setIsLoggedIn(true);
-                setShowLogin(false);
-              }}
-            >
-              Login
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Navbar */}
-      <header className="navbar">
-        <h2>MemoryVerse AI</h2>
-
-        {isLoggedIn ? (
-          <button
-            className="login-btn"
-            onClick={() => setIsLoggedIn(false)}
-          >
-            Logout
-          </button>
-        ) : (
-          <button
-            className="login-btn"
-            onClick={() => setShowLogin(true)}
-          >
-            Login
-          </button>
-        )}
-      </header>
-
-      {/* Hero Section */}
-      <section className="hero">
-        <h1>
-          Your Intelligent <span>Digital Identity</span>
-        </h1>
-
-        <p>
-          Upload and manage your important documents securely.
-        </p>
-
-        <div className="category-select">
-          <label>Select Document Type</label>
-
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option>Resume</option>
-            <option>Certificate</option>
-            <option>Internship</option>
-            <option>Project</option>
-            <option>Academic</option>
-          </select>
-        </div>
-
-        <label className="upload-btn">
-          📤 Upload {category}
-
-          <input
-            type="file"
-            hidden
-            multiple
-            accept=".pdf,.doc,.docx,.jpg,.png,.jpeg"
-            onChange={handleUpload}
-          />
-        </label>
-      </section>
-
-      {/* Dashboard */}
-      <section className="categories">
-        <div className="category-card">
-          <h3>Total Documents</h3>
-          <h1>{documents.length}</h1>
-        </div>
-
-        <div className="category-card">
-          <h3>Resume</h3>
-          <h1>
-            {documents.filter(d => d.category === "Resume").length}
-          </h1>
-        </div>
-
-        <div className="category-card">
-          <h3>Certificates</h3>
-          <h1>
-            {documents.filter(d => d.category === "Certificate").length}
-          </h1>
-        </div>
-
-        <div className="category-card">
-          <h3>Projects</h3>
-          <h1>
-            {documents.filter(d => d.category === "Project").length}
-          </h1>
-        </div>
-      </section>
-            {/* Documents */}
-      <section className="documents">
-        <h2>📁 My Documents</h2>
-
-        <input
-          type="text"
-          placeholder="🔍 Search Documents..."
-          className="search-box"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+  // Quick category navigation handler
+  const renderTabContent = () => {
+    if (!isLoggedIn && activeTab !== "landing") {
+      return (
+        <LandingPage
+          onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode })}
+          onExploreDemo={() => {
+            setIsLoggedIn(true);
+            setActiveTab("dashboard");
+            showToast("Entered interactive demo mode!", "info");
+          }}
         />
+      );
+    }
 
-        <select
-          className="filter-box"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="All">All</option>
-          <option value="Resume">Resume</option>
-          <option value="Certificate">Certificate</option>
-          <option value="Internship">Internship</option>
-          <option value="Project">Project</option>
-          <option value="Academic">Academic</option>
-        </select>
+    switch (activeTab) {
+      case "landing":
+        return (
+          <LandingPage
+            onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode })}
+            onExploreDemo={() => {
+              setIsLoggedIn(true);
+              setActiveTab("dashboard");
+              showToast("Entered interactive demo mode!", "info");
+            }}
+          />
+        );
 
-        {filteredDocuments.length === 0 ? (
-          <p className="empty">No Documents Found</p>
-        ) : (
-          <div className="document-list">
-            {filteredDocuments.map((doc) => (
-              <div className="document-item" key={doc.id}>
-                <div>
-                  <h3>{doc.name}</h3>
+      case "dashboard":
+        return (
+          <DashboardView
+            user={user}
+            documents={documents}
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            setActiveTab={setActiveTab}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+            onOpenPublicProfile={() => setPublicProfileModal(true)}
+          />
+        );
 
-                  <p>
-                    <b>Category:</b> {doc.category}
-                  </p>
+      case "documents":
+        return (
+          <DocumentsView
+            documents={documents}
+            initialCategoryFilter="All"
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+          />
+        );
 
-                  <p>
-                    <b>Size:</b> {doc.size}
-                  </p>
+      case "resumes":
+        return (
+          <DocumentsView
+            documents={documents}
+            initialCategoryFilter="Resume"
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+          />
+        );
 
-                  <p>
-                    <b>Uploaded:</b> {doc.uploadedAt}
-                  </p>
-                </div>
+      case "credentials":
+        return (
+          <DocumentsView
+            documents={documents}
+            initialCategoryFilter="Certificate"
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+          />
+        );
 
-                <div className="document-actions">
-                  <a
-                    href={doc.url}
-                    download={doc.name}
-                    className="download-btn"
-                  >
-                    ⬇ Download
-                  </a>
+      case "projects":
+        return (
+          <DocumentsView
+            documents={documents}
+            initialCategoryFilter="Project"
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+          />
+        );
 
-                  <a
-                    href={doc.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="preview-btn"
-                  >
-                    👀 Preview
-                  </a>
+      case "academic":
+        return (
+          <DocumentsView
+            documents={documents}
+            initialCategoryFilter="Academic"
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+          />
+        );
 
-                  <button
-                    className="delete-btn"
-                    onClick={() => deleteDocument(doc.id)}
-                  >
-                    🗑 Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      case "profile":
+        return (
+          <ProfileView
+            user={user}
+            onUpdateProfile={handleUpdateProfile}
+            onOpenPublicProfile={() => setPublicProfileModal(true)}
+            onShowToast={showToast}
+          />
+        );
 
-      <footer className="footer">
-        <h3>MemoryVerse AI</h3>
+      default:
+        return (
+          <DashboardView
+            user={user}
+            documents={documents}
+            onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+            setActiveTab={setActiveTab}
+            onPreviewDoc={(doc) => setDetailModal({ isOpen: true, doc })}
+            onEditDoc={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+            onDeleteDoc={(docId) => setConfirmModal({ isOpen: true, docId })}
+            onOpenPublicProfile={() => setPublicProfileModal(true)}
+          />
+        );
+    }
+  };
 
-        <p>
-          Smart Digital Identity Management System
-        </p>
+  return (
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+      
+      {/* Toast Notification Container */}
+      <Toast toast={toast} onClose={() => setToast(null)} />
 
-        <p>
-          © 2026 Developed by Govindharaj M
-        </p>
-      </footer>
+      {/* Main Top Navbar */}
+      <Navbar
+        isLoggedIn={isLoggedIn}
+        user={user}
+        onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode })}
+        onLogout={handleLogout}
+        onOpenUpload={() => setDocumentModal({ isOpen: true, docToEdit: null })}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onOpenPublicProfile={() => setPublicProfileModal(true)}
+      />
 
-    </>
+      {/* View Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+        {renderTabContent()}
+      </main>
+
+      {/* Auth Dialog */}
+      <AuthModal
+        isOpen={authModal.isOpen}
+        initialMode={authModal.mode}
+        onClose={() => setAuthModal({ isOpen: false, mode: "login" })}
+        onAuthSuccess={handleAuthSuccess}
+      />
+
+      {/* Document Create / Edit Dialog */}
+      <DocumentModal
+        isOpen={documentModal.isOpen}
+        docToEdit={documentModal.docToEdit}
+        onClose={() => setDocumentModal({ isOpen: false, docToEdit: null })}
+        onSave={handleSaveDocument}
+      />
+
+      {/* Document Detail Preview Dialog */}
+      <DocumentDetailModal
+        doc={detailModal.doc}
+        isOpen={detailModal.isOpen}
+        onClose={() => setDetailModal({ isOpen: false, doc: null })}
+        onEdit={(doc) => setDocumentModal({ isOpen: true, docToEdit: doc })}
+        onDelete={(docId) => setConfirmModal({ isOpen: true, docId })}
+        onShowToast={showToast}
+      />
+
+      {/* Public Digital Identity Dialog */}
+      <PublicIdentityModal
+        isOpen={publicProfileModal}
+        user={user}
+        documents={documents}
+        onClose={() => setPublicProfileModal(false)}
+        onShowToast={showToast}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title="Delete Document Record?"
+        message="Are you sure you want to delete this document from your identity vault? This action cannot be undone."
+        confirmText="Delete Record"
+        onConfirm={() => handleDeleteDocument(confirmModal.docId)}
+        onClose={() => setConfirmModal({ isOpen: false, docId: null })}
+      />
+
+    </div>
   );
 }
 
